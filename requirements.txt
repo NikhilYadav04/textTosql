@@ -1,0 +1,9 @@
+langchain-groq
+langgraph
+langchain-core
+mysql-connector-python
+ragas
+datasets
+prettytable
+colorama
+python-dotenv
