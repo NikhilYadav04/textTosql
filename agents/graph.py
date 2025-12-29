@@ -1,20 +1,31 @@
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from agents.state import AgentState
-from agents.nodes import generate_sql_node, execute_sql_node, format_answer_node, evaluate_node
+from agents.nodes import (
+    generate_sql_node,
+    execute_sql_node,
+    format_answer_node,
+    evaluate_node,
+)
 from colorama import Fore
 
 
-def create_graph(db):
+def create_graph(db, llm):
     """Create the LangGraph Workflow"""
 
     workflow = StateGraph(AgentState)
 
-    # Add Nodes with db parameter
-    workflow.add_node("generate_sql", lambda state: generate_sql_node(state, db))
-    workflow.add_node("execute_sql", lambda state: execute_sql_node(state, db))
-    workflow.add_node("format_answer", format_answer_node)
-    workflow.add_node("evaluate", evaluate_node)
+    workflow.add_node(
+        "generate_sql", lambda state: generate_sql_node(state, db=db, llm=llm)
+    )
+
+    workflow.add_node(
+        "execute_sql", lambda state: execute_sql_node(state, db=db, llm=llm)
+    )
+
+    workflow.add_node("format_answer", lambda state: format_answer_node(state, llm=llm))
+
+    workflow.add_node("evaluate", lambda state: evaluate_node(state, llm=llm))
 
     # Define flow
     workflow.add_edge(START, "generate_sql")

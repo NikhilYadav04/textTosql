@@ -10,6 +10,30 @@ from agents.graph import create_graph
 from database.manager import DatabaseManager
 from utils.validator import validate_query
 
+st.markdown(
+    """
+<style>
+    .status-box {
+        padding: 1rem;
+        border-radius: 8px;
+        background-color: #f0f2f6;
+        border-left: 5px solid #4CAF50;
+        color: #31333F;
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+    }
+    /* Dark mode adjustment if needed */
+    @media (prefers-color-scheme: dark) {
+        .status-box {
+            background-color: #262730;
+            color: #FAFAFA;
+        }
+    }
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
 # Page config
 st.set_page_config(
     page_title="Text-to-SQL Query Interface",
@@ -191,7 +215,7 @@ else:
 
         else:
             # Create the graph
-            app = create_graph(db=st.session_state.db)
+            app = create_graph(db=st.session_state.db, llm=st.session_state.llm)
 
             # Initialize state
             initial_state = {
@@ -240,21 +264,68 @@ else:
 
             try:
                 step_count = 0
-                total_steps = 4
+                expected_steps = [
+                    "generate_sql",
+                    "execute_sql",
+                    "format_answer",
+                    "evaluate",
+                ]
+                total_steps = len(expected_steps)
+
+                # Add timeout counter
+                max_iterations = 20
+                iteration_count = 0
 
                 for step in app.stream(initial_state, config):
-                    step_count += 1
-                    progress_bar.progress(step_count / total_steps)
+                    iteration_count += 1
+
+                    # Prevent infinite loops
+                    if iteration_count > max_iterations:
+                        st.error(
+                            f"⚠️ Execution timeout: Maximum iterations ({max_iterations}) reached"
+                        )
+                        break
 
                     for key, value in step.items():
-                        status_text.text(f"Processing: {key}")
+                        # Debug output
+                        with st.expander(
+                            f"🔍 Debug: Step {iteration_count}", expanded=False
+                        ):
+                            st.write(f"**Node:** {key}")
+                            st.json(
+                                {
+                                    "keys_in_value": (
+                                        list(value.keys())
+                                        if isinstance(value, dict)
+                                        else "not a dict"
+                                    )
+                                }
+                            )
+
+                        # Only increment for expected steps
+                        if key in expected_steps:
+                            step_count += 1
+
+                        # Update progress, capped at 1.0
+                        progress_value = min(step_count / total_steps, 1.0)
+                        progress_bar.progress(progress_value)
+
+                        status_text.text(
+                            f"Processing: {key} (iteration {iteration_count})"
+                        )
 
                         if key == "generate_sql":
                             with execution_expander:
                                 with col1:
-                                    sql_gen_status.success("✅ SQL Generated")
-                                    if value.get("sql_query"):
-                                        st.code(value["sql_query"], language="sql")
+                                    if value.get("error"):
+                                        sql_gen_status.error(f"❌ Error")
+                                        st.error(
+                                            f"SQL Generation Error: {value['error']}"
+                                        )
+                                    else:
+                                        sql_gen_status.success("✅ SQL Generated")
+                                        if value.get("sql_query"):
+                                            st.code(value["sql_query"], language="sql")
 
                         elif key == "execute_sql":
                             with execution_expander:
@@ -263,6 +334,7 @@ else:
                                         sql_exec_status.error(
                                             f"❌ {value['error'][:50]}"
                                         )
+                                        st.error(f"**Full Error:** {value['error']}")
                                     else:
                                         sql_exec_status.success("✅ Query Executed")
                                         if value.get("results"):

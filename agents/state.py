@@ -13,3 +13,4 @@ class AgentState(TypedDict):
     answer: Optional[str]
     error: Optional[str]
     retry_count: int
+    evaluation_score : Optional[float]

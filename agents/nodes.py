@@ -3,10 +3,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import AIMessage
 from langchain_core.output_parsers import StrOutputParser
 from agents.state import AgentState
-from config.settings import llm
 
 
-def generate_sql_node(state: AgentState, db) -> dict:
+def generate_sql_node(state: AgentState, db, llm) -> dict:
     """Generate SQL from natural language"""
 
     prompt = ChatPromptTemplate.from_template(
@@ -48,7 +47,7 @@ def generate_sql_node(state: AgentState, db) -> dict:
         }
 
 
-def execute_sql_node(state: AgentState, db):
+def execute_sql_node(state: AgentState, db, llm):
     """Execute SQL with retry node"""
 
     if not state.get("sql_query"):
@@ -131,7 +130,7 @@ def execute_sql_node(state: AgentState, db):
         }
 
 
-def format_answer_node(state: AgentState) -> dict:
+def format_answer_node(state: AgentState, llm) -> dict:
     """Format results as natural language"""
 
     if state.get("error"):
@@ -191,7 +190,7 @@ def format_answer_node(state: AgentState) -> dict:
         }
 
 
-def evaluate_node(state: AgentState) -> dict:
+def evaluate_node(state: AgentState, llm) -> dict:
     """Simple RAGAS evaluation"""
 
     if not state.get("answer") or not state.get("sql_query"):
@@ -222,7 +221,10 @@ def evaluate_node(state: AgentState) -> dict:
 
         print(f"{Fore.GREEN}RAGAS Score: {score:.2f}")
 
-        return {"messages": [AIMessage(content=f"Evaluation: {score:.2f}")]}
+        return {
+            "evaluation_score": score,
+            "messages": [AIMessage(content=f"Evaluation: {score:.2f}")],
+        }
 
     except Exception as e:
         print(f"{Fore.YELLOW}Evaluation skipped: {str(e)}")
